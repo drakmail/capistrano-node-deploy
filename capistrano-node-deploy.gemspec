@@ -5,13 +5,13 @@
 
 Gem::Specification.new do |s|
   s.name = "capistrano-node-deploy"
-  s.version = "1.2.4"
+  s.version = "1.3"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
-  s.authors = ["James Smith"]
-  s.date = "2013-03-21"
-  s.description = "Capistrano recipes for deploying node apps"
-  s.email = "james@loopj.com"
+  s.authors = ["James Smith", "Alexander Maslov"]
+  s.date = "2013-06-08"
+  s.description = "Capistrano recipes for deploying node apps, for debian and init.d."
+  s.email = "drakmail@delta.pm"
   s.extra_rdoc_files = [
     "LICENSE.txt",
     "README.md"
@@ -29,11 +29,11 @@ Gem::Specification.new do |s|
     "lib/capistrano/node-deploy.rb",
     "test/helper.rb"
   ]
-  s.homepage = "http://github.com/loopj/capistrano-node-deploy"
+  s.homepage = "http://github.com/drakmail/capistrano-node-deploy"
   s.licenses = ["MIT"]
   s.require_paths = ["lib"]
   s.rubygems_version = "1.8.24"
-  s.summary = "Capistrano recipes for deploying node apps"
+  s.summary = "Capistrano recipes for deploying node apps with debian and init scripts"
 
   if s.respond_to? :specification_version then
     s.specification_version = 3

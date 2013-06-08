@@ -15,12 +15,12 @@ require 'jeweler'
 Jeweler::Tasks.new do |gem|
   # gem is a Gem::Specification... see http://docs.rubygems.org/read/chapter/20 for more options
   gem.name = "capistrano-node-deploy"
-  gem.homepage = "http://github.com/loopj/capistrano-node-deploy"
+  gem.homepage = "http://github.com/drakmail/capistrano-node-deploy"
   gem.license = "MIT"
-  gem.summary = %Q{Capistrano recipes for deploying node apps}
-  gem.description = %Q{Capistrano recipes for deploying node apps}
-  gem.email = "james@loopj.com"
-  gem.authors = ["James Smith"]
+  gem.summary = %Q{Capistrano recipes for deploying node apps with debian and init scripts}
+  gem.description = %Q{Capistrano recipes for deploying node apps with debian and init scripts}
+  gem.email = "drakmail@delta.pm"
+  gem.authors = ["James Smith", "Alexander Maslov"]
   # dependencies defined in Gemfile
 end
 Jeweler::RubygemsDotOrgTasks.new

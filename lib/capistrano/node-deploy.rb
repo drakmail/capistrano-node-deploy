@@ -17,7 +17,7 @@ end
 
 Capistrano::Configuration.instance(:must_exist).load do |configuration|
   before "deploy", "deploy:create_release_dir"
-  before "deploy", "node:check_upstart_config"
+  before "deploy", "node:check_init_config"
   after "deploy:update", "node:install_packages", "node:restart"
   after "deploy:rollback", "node:restart"
 
@@ -31,23 +31,103 @@ Capistrano::Configuration.instance(:must_exist).load do |configuration|
   set :node_env, "production" unless defined? node_env
   set :node_user, "deploy" unless defined? node_user
 
-  set :upstart_job_name, lambda { "#{application}-#{node_env}" } unless defined? upstart_job_name
-  set :upstart_file_path, lambda { "/etc/init/#{upstart_job_name}.conf" } unless defined? upstart_file_path
-  _cset(:upstart_file_contents) {
+  set :init_job_name, lambda { "#{application}-#{node_env}" } unless defined? init_job_name
+  set :init_file_path, lambda { "/etc/init.d/#{init_job_name}" } unless defined? init_file_path
+  _cset(:init_file_contents) {
 <<EOD
-#!upstart
-description "#{application} node app"
-author      "capistrano"
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          #{application}-#{node_env}
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start #{application} with node.js
+### END INIT INFO
 
-start on runlevel [2345]
-stop on shutdown
+# Author: Alexander Maslov <drakmail@delta.pm>
 
-respawn
-respawn limit 99 5
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/local/bin
+DESC="It run #{application}"
+NAME=node
+DAEMON=/usr/local/bin/$NAME
+DAEMON_ARGS="#{current_path}/#{app_command}"
+PIDFILE=/var/run/$NAME.pid
+SCRIPTNAME=/etc/init.d/#{init_job_name}
+[ -x "$DAEMON" ] || exit 0
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+. /lib/init/vars.sh
+. /lib/lsb/init-functions
 
-script
-    cd #{current_path} && exec sudo -u #{node_user} NODE_ENV=#{node_env} #{app_environment} #{node_binary} #{current_path}/#{app_command} 2>> #{shared_path}/#{node_env}.err.log 1>> #{shared_path}/#{node_env}.out.log
-end script
+do_start()
+{
+	start-stop-daemon --start --quiet --pidfile $PIDFILE --exec $DAEMON --test > /dev/null \
+		|| return 1
+	start-stop-daemon --start --quiet --pidfile $PIDFILE -b -m --exec $DAEMON -- \
+		$DAEMON_ARGS 2> /var/log/$NAME.log \
+		|| return 2
+}
+
+do_stop()
+{
+	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
+	RETVAL="$?"
+	[ "$RETVAL" = 2 ] && return 2
+	start-stop-daemon --stop --quiet --oknodo --retry=0/30/KILL/5 --exec $DAEMON
+	[ "$?" = 2 ] && return 2
+	rm -f $PIDFILE
+	return "$RETVAL"
+}
+
+do_reload() {
+	start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --name $NAME
+	return 0
+}
+
+case "$1" in
+  start)
+	[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+	do_start
+	case "$?" in
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+	esac
+	;;
+  stop)
+	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+	do_stop
+	case "$?" in
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+	esac
+	;;
+  status)
+	status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
+	;;
+  restart|force-reload)
+	log_daemon_msg "Restarting $DESC" "$NAME"
+	do_stop
+	case "$?" in
+	  0|1)
+		do_start
+		case "$?" in
+			0) log_end_msg 0 ;;
+			1) log_end_msg 1 ;; # Old process is still running
+			*) log_end_msg 1 ;; # Failed to start
+		esac
+		;;
+	  *)
+		log_end_msg 1
+		;;
+	esac
+	;;
+  *)
+	echo "Usage: $SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+	exit 3
+	;;
+esac
+:
 EOD
   }
 
@@ -55,42 +135,40 @@ EOD
   namespace :node do
     desc "Check required packages and install if packages are not installed"
     task :install_packages do
-      run "mkdir -p #{shared_path}/node_modules"
       run "cp #{release_path}/package.json #{shared_path}"
-      run "cp #{release_path}/npm-shrinkwrap.json #{shared_path}"
-      run "cd #{shared_path} && npm install #{(node_env != 'production') ? '--dev' : ''} --loglevel warn"
+      run "cd #{shared_path} && npm install #{(node_env != 'production') ? '--dev' : ''}"
       run "ln -s #{shared_path}/node_modules #{release_path}/node_modules"
     end
 
-    task :check_upstart_config do
-      create_upstart_config if remote_file_differs?(upstart_file_path, upstart_file_contents)
+    task :check_init_config do
+      create_init_config if remote_file_differs?(init_file_path, init_file_contents)
     end
 
-    desc "Create upstart script for this node app"
-    task :create_upstart_config do
+    desc "Create init script for this node app"
+    task :create_init_config do
       temp_config_file_path = "#{shared_path}/#{application}.conf"
 
-      # Generate and upload the upstart script
-      put upstart_file_contents, temp_config_file_path
+      # Generate and upload the init script
+      put init_file_contents, temp_config_file_path
 
       # Copy the script into place and make executable
-      sudo "cp #{temp_config_file_path} #{upstart_file_path}"
+      sudo "cp #{temp_config_file_path} #{init_file_path}"
+      sudo "chmod +x #{init_file_path}"
     end
 
     desc "Start the node application"
     task :start do
-      sudo "start #{upstart_job_name}"
+      sudo "/etc/init.d/#{init_job_name} start"
     end
 
     desc "Stop the node application"
     task :stop do
-      sudo "stop #{upstart_job_name}"
+      sudo "/etc/init.d/#{init_job_name} stop"
     end
 
     desc "Restart the node application"
     task :restart do
-      sudo "stop #{upstart_job_name}; true"
-      sudo "start #{upstart_job_name}"
+      sudo "/etc/init.d/#{init_job_name} restart"
     end
   end
 
