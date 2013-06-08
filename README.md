@@ -7,7 +7,7 @@ Features
 --------
 - Provides `cap deploy` functionality for your node app
 - Installs node packages (`npm install`) during deploys, using a shared folder for speed
-- Automatically creates upstart scripts for your node apps
+- Automatically creates init scripts for your node apps
 - Provides tasks for starting (`cap node:start`) and stopping (`cap node:stop`) your node app
 
 
@@ -62,8 +62,8 @@ set :node_env, "staging"
 # Set the user to run node as (defaults to deploy)
 set :node_user, "james"
 
-# Set the name of the upstart command (defaults to #{application}-#{node_env})
-set :upstart_job_name, "myserver"
+# Set the name of the init command (defaults to #{application}-#{node_env})
+set :init_job_name, "myserver"
 ```
 
 
@@ -82,6 +82,5 @@ Contributing to capistrano-node-deploy
 Copyright
 ---------
 
-Copyright (c) 2012 James Smith. See LICENSE.txt for
-further details.
+Copyright (c) 2013 James Smith, Alexander Maslov. See LICENSE.txt for further details.
 
